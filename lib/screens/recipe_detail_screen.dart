@@ -208,8 +208,11 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: NotificationListener<ScrollNotification>(
         onNotification: (ScrollNotification scrollInfo) {
           setState(() {
@@ -241,6 +244,8 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
   }
 
   Widget _buildModernAppBar() {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
     return SliverAppBar(
       expandedHeight: 350,
       pinned: true,
@@ -255,7 +260,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
             filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.3),
+                color: Colors.black.withOpacity(isDarkMode ? 0.4 : 0.3),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: IconButton(
@@ -279,7 +284,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
                     end: Alignment.bottomCenter,
                     colors: [
                       Colors.transparent,
-                      Colors.black.withOpacity(0.7),
+                      Colors.black.withOpacity(isDarkMode ? 0.8 : 0.7),
                     ],
                   ),
                 ),
@@ -313,7 +318,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
                   end: Alignment.bottomCenter,
                   colors: [
                     Colors.transparent,
-                    Colors.black.withOpacity(0.4),
+                    Colors.black.withOpacity(isDarkMode ? 0.5 : 0.4),
                   ],
                 ),
                 backgroundBlendMode: BlendMode.overlay,
@@ -326,7 +331,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
         Container(
           margin: const EdgeInsets.only(right: 8),
           decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.3),
+            color: Colors.black.withOpacity(isDarkMode ? 0.4 : 0.3),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
@@ -362,6 +367,9 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
   }
 
   Widget _buildRecipeHeader() {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    
     return SliverToBoxAdapter(
       child: FadeTransition(
         opacity: _fadeAnimation,
@@ -372,7 +380,10 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [
+                colors: isDarkMode ? [
+                  theme.cardColor,
+                  theme.cardColor.withOpacity(0.8),
+                ] : [
                   Colors.white,
                   Colors.grey[50]!,
                 ],
@@ -382,7 +393,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.1),
                   blurRadius: 20,
                   offset: const Offset(0, 10),
                 ),
@@ -396,7 +407,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
                   style: TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.bold,
-                    color: Colors.grey[800],
+                    color: theme.textTheme.titleLarge?.color,
                     height: 1.2,
                   ),
                 ),
@@ -405,7 +416,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
                   widget.recipe.description,
                   style: TextStyle(
                     fontSize: 16,
-                    color: Colors.grey[600],
+                    color: theme.textTheme.bodyLarge?.color?.withOpacity(0.8),
                     height: 1.5,
                   ),
                 ),
@@ -468,11 +479,17 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
   }
 
   Widget _buildGlassInfoCard(IconData icon, String title, String value, Color color) {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
+          colors: isDarkMode ? [
+            color.withOpacity(0.15),
+            color.withOpacity(0.08),
+          ] : [
             color.withOpacity(0.1),
             color.withOpacity(0.05),
           ],
@@ -481,12 +498,12 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
         ),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: color.withOpacity(0.2),
+          color: color.withOpacity(isDarkMode ? 0.3 : 0.2),
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.1),
+            color: color.withOpacity(isDarkMode ? 0.2 : 0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -497,7 +514,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.15),
+              color: color.withOpacity(isDarkMode ? 0.2 : 0.15),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
@@ -512,7 +529,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: Colors.grey[600],
+              color: theme.textTheme.bodyMedium?.color?.withOpacity(0.8),
             ),
             textAlign: TextAlign.center,
           ),
@@ -522,7 +539,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.bold,
-              color: Colors.grey[800],
+              color: theme.textTheme.titleMedium?.color,
             ),
             textAlign: TextAlign.center,
           ),
@@ -532,15 +549,18 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
   }
 
   Widget _buildTabSection() {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    
     return SliverToBoxAdapter(
       child: Container(
         margin: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: theme.cardColor,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.05),
               blurRadius: 15,
               offset: const Offset(0, 5),
             ),
@@ -549,7 +569,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
         child: TabBar(
           controller: _tabController,
           labelColor: Colors.white,
-          unselectedLabelColor: Colors.grey[600],
+          unselectedLabelColor: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
           indicator: BoxDecoration(
             gradient: LinearGradient(
               colors: [
@@ -619,14 +639,14 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  Colors.white,
-                  Colors.grey[50]!,
+                  Theme.of(context).cardColor,
+                  Theme.of(context).cardColor.withOpacity(0.8),
                 ],
               ),
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withOpacity(Theme.of(context).brightness == Brightness.dark ? 0.3 : 0.05),
                   blurRadius: 10,
                   offset: const Offset(0, 2),
                 ),
@@ -651,9 +671,10 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
                 Expanded(
                   child: Text(
                     '${ingredient.quantity} ${ingredient.unit} ${ingredient.name}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
+                      color: Theme.of(context).textTheme.bodyLarge?.color,
                     ),
                   ),
                 ),
@@ -688,14 +709,14 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  Colors.white,
-                  Colors.grey[50]!,
+                  Theme.of(context).cardColor,
+                  Theme.of(context).cardColor.withOpacity(0.8),
                 ],
               ),
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.08),
+                  color: Colors.black.withOpacity(Theme.of(context).brightness == Brightness.dark ? 0.3 : 0.08),
                   blurRadius: 15,
                   offset: const Offset(0, 5),
                 ),
@@ -738,10 +759,11 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
                 Expanded(
                   child: Text(
                     step.description,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
                       height: 1.5,
                       fontWeight: FontWeight.w500,
+                      color: Theme.of(context).textTheme.bodyLarge?.color,
                     ),
                   ),
                 ),
@@ -789,6 +811,8 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
   }
 
   Widget _buildEmptyReviewsState() {
+    final theme = Theme.of(context);
+    
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -798,8 +822,8 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  Colors.grey[100]!,
-                  Colors.grey[50]!,
+                  theme.cardColor,
+                  theme.cardColor.withOpacity(0.5),
                 ],
               ),
               shape: BoxShape.circle,
@@ -807,7 +831,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
             child: Icon(
               Icons.rate_review_rounded,
               size: 64,
-              color: Colors.grey[400],
+              color: theme.textTheme.bodyMedium?.color?.withOpacity(0.5),
             ),
           ),
           const SizedBox(height: 24),
@@ -816,7 +840,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
-              color: Colors.grey[700],
+              color: theme.textTheme.titleLarge?.color,
             ),
           ),
           const SizedBox(height: 8),
@@ -824,7 +848,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
             'Be the first to share your experience!',
             style: TextStyle(
               fontSize: 16,
-              color: Colors.grey[500],
+              color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
             ),
           ),
           const SizedBox(height: 32),
@@ -889,6 +913,8 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
   }
 
   Widget _buildLoadingWidget() {
+    final theme = Theme.of(context);
+    
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -901,7 +927,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
           Text(
             'Loading...',
             style: TextStyle(
-              color: Colors.grey[600],
+              color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
               fontSize: 16,
             ),
           ),
@@ -911,6 +937,8 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
   }
 
   Widget _buildEmptyState(String message, IconData icon) {
+    final theme = Theme.of(context);
+    
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -918,13 +946,13 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: Colors.grey[100],
+              color: theme.cardColor,
               shape: BoxShape.circle,
             ),
             child: Icon(
               icon,
               size: 48,
-              color: Colors.grey[400],
+              color: theme.textTheme.bodyMedium?.color?.withOpacity(0.5),
             ),
           ),
           const SizedBox(height: 16),
@@ -932,7 +960,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
             message,
             style: TextStyle(
               fontSize: 18,
-              color: Colors.grey[600],
+              color: theme.textTheme.bodyLarge?.color?.withOpacity(0.8),
             ),
           ),
         ],
@@ -987,6 +1015,8 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
     HapticFeedback.lightImpact();
     final TextEditingController commentController = TextEditingController();
     double rating = 0.0;
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
 
     await showDialog(
       context: context,
@@ -1004,7 +1034,10 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [
+                    colors: isDarkMode ? [
+                      theme.cardColor,
+                      theme.cardColor.withOpacity(0.9),
+                    ] : [
                       Colors.white,
                       Colors.grey[50]!,
                     ],
@@ -1012,7 +1045,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
                   borderRadius: BorderRadius.circular(24),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
+                      color: Colors.black.withOpacity(isDarkMode ? 0.4 : 0.1),
                       blurRadius: 20,
                       offset: const Offset(0, 10),
                     ),
@@ -1041,12 +1074,13 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
                           ),
                         ),
                         const SizedBox(width: 16),
-                        const Expanded(
+                        Expanded(
                           child: Text(
                             'Add Your Review',
                             style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
+                              color: theme.textTheme.titleLarge?.color,
                             ),
                           ),
                         ),
@@ -1058,24 +1092,25 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.grey[50],
+                        color: theme.cardColor.withOpacity(0.5),
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.grey[200]!),
+                        border: Border.all(color: theme.dividerColor),
                       ),
                       child: Column(
                         children: [
                           Text(
                             'Rating: ${rating.toStringAsFixed(1)} ⭐',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
+                              color: theme.textTheme.titleMedium?.color,
                             ),
                           ),
                           const SizedBox(height: 8),
                           SliderTheme(
                             data: SliderTheme.of(context).copyWith(
                               activeTrackColor: AppTheme.primaryColor,
-                              inactiveTrackColor: Colors.grey[300],
+                              inactiveTrackColor: theme.dividerColor,
                               thumbColor: AppTheme.primaryColor,
                               overlayColor: AppTheme.primaryColor.withOpacity(0.2),
                               thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 12),
@@ -1102,17 +1137,20 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
                     // Comment Section
                     Container(
                       decoration: BoxDecoration(
-                        color: Colors.grey[50],
+                        color: theme.cardColor.withOpacity(0.5),
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.grey[200]!),
+                        border: Border.all(color: theme.dividerColor),
                       ),
                       child: TextField(
                         controller: commentController,
-                        decoration: const InputDecoration(
+                        style: TextStyle(color: theme.textTheme.bodyLarge?.color),
+                        decoration: InputDecoration(
                           labelText: 'Your Comment',
+                          labelStyle: TextStyle(color: theme.textTheme.bodyMedium?.color),
                           hintText: 'Share your experience with this recipe...',
+                          hintStyle: TextStyle(color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6)),
                           border: InputBorder.none,
-                          contentPadding: EdgeInsets.all(16),
+                          contentPadding: const EdgeInsets.all(16),
                         ),
                         maxLines: 4,
                         textInputAction: TextInputAction.done,
@@ -1131,14 +1169,15 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
                               padding: const EdgeInsets.symmetric(vertical: 16),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                side: BorderSide(color: Colors.grey[300]!),
+                                side: BorderSide(color: theme.dividerColor),
                               ),
                             ),
-                            child: const Text(
+                            child: Text(
                               'Cancel',
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
+                                color: theme.textTheme.bodyLarge?.color,
                               ),
                             ),
                           ),

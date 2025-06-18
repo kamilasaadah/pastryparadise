@@ -1102,5 +1102,70 @@ class AdaptiveRadio<T> extends StatelessWidget {
       );
     }
   }
+
+  
 }
 
+// Tambahkan widget ini ke file adaptive_widgets.dart Anda yang sudah ada
+// Letakkan setelah AdaptiveAppBar
+
+// AdaptiveBackButton - Widget yang hilang
+class AdaptiveBackButton extends StatelessWidget {
+  final VoidCallback? onPressed;
+  final Color? color;
+
+  const AdaptiveBackButton({
+    Key? key,
+    this.onPressed,
+    this.color,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final isDarkMode = PlatformHelper.isDarkMode(context);
+    
+    if (PlatformHelper.shouldUseMaterial) {
+      return IconButton(
+        onPressed: onPressed ?? () => Navigator.of(context).pop(),
+        icon: Icon(
+          Icons.arrow_back,
+          color: color ?? (isDarkMode ? AppTheme.darkTextColor : AppTheme.textColor),
+        ),
+      );
+    } else {
+      return CupertinoButton(
+        padding: EdgeInsets.zero,
+        onPressed: onPressed ?? () => Navigator.of(context).pop(),
+        child: Icon(
+          CupertinoIcons.back,
+          color: color ?? (isDarkMode ? AppTheme.darkTextColor : AppTheme.textColor),
+        ),
+      );
+    }
+  }
+}
+
+// AdaptiveIcon - Widget tambahan yang berguna
+class AdaptiveIcon extends StatelessWidget {
+  final IconData materialIcon;
+  final IconData cupertinoIcon;
+  final double? size;
+  final Color? color;
+
+  const AdaptiveIcon({
+    Key? key,
+    required this.materialIcon,
+    required this.cupertinoIcon,
+    this.size,
+    this.color,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Icon(
+      PlatformHelper.shouldUseMaterial ? materialIcon : cupertinoIcon,
+      size: size,
+      color: color,
+    );
+  }
+}

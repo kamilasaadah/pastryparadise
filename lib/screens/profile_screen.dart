@@ -1,14 +1,18 @@
-// ignore_for_file: deprecated_member_use
+// Updated ProfileScreen with requested changes
+// ignore_for_file: deprecated_member_use, avoid_print
 
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
-import '../services/database_helper.dart';
+import '../services/profile_service.dart'; // Gunakan PocketBaseService yang sudah diperbaiki
+import '../models/user_model.dart';
 import '../providers/theme_provider.dart';
 import '../utils/platform_helper.dart';
 import '../widgets/adaptive_widgets.dart' as adaptive;
 import '../theme/app_theme.dart';
 import 'settings_screen.dart';
+import 'edit_profile_screen.dart';
+import 'help_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -18,7 +22,7 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class ProfileScreenState extends State<ProfileScreen> with TickerProviderStateMixin {
-  Map<String, dynamic>? _userData;
+  UserModel? _userData;
   bool _isLoading = true;
   late AnimationController _animationController;
   late AnimationController _cardAnimationController;
@@ -70,12 +74,14 @@ class ProfileScreenState extends State<ProfileScreen> with TickerProviderStateMi
   }
 
   Future<void> _loadUserData() async {
+    print('=== Loading User Data ===');
     setState(() {
       _isLoading = true;
     });
 
     try {
-      final userData = await DatabaseHelper.instance.getCurrentUser();
+      final userData = await PocketBaseService.getCurrentUser();
+      print('Loaded user data: $userData');
 
       if (!mounted) return;
 
@@ -84,12 +90,26 @@ class ProfileScreenState extends State<ProfileScreen> with TickerProviderStateMi
         _isLoading = false;
       });
 
-      // Start animations after data is loaded
-      _animationController.forward();
-      Future.delayed(const Duration(milliseconds: 300), () {
-        _cardAnimationController.forward();
-      });
+      if (userData != null) {
+        print('User loaded successfully:');
+        print('- Name: ${userData.name}');
+        print('- Email: ${userData.email}');
+        print('- Avatar: ${userData.avatar}');
+        print('- Avatar URL: ${userData.getAvatarUrl(PocketBaseService.baseUrl)}');
+        
+        // Start animations after data is loaded
+        _animationController.forward();
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (mounted) {
+            _cardAnimationController.forward();
+          }
+        });
+      } else {
+        print('No user data received');
+        _showErrorSnackBar('Gagal memuat data pengguna. Silakan login ulang.');
+      }
     } catch (e) {
+      print('Error loading user data: $e');
       if (!mounted) return;
 
       setState(() {
@@ -144,7 +164,7 @@ class ProfileScreenState extends State<ProfileScreen> with TickerProviderStateMi
       onCancel: () {},
       onConfirm: () async {
         try {
-          await DatabaseHelper.instance.logoutUser();
+          await PocketBaseService.logout();
           if (!mounted) return;
           Navigator.pushReplacementNamed(context, '/login');
         } catch (e) {
@@ -154,10 +174,59 @@ class ProfileScreenState extends State<ProfileScreen> with TickerProviderStateMi
     );
   }
 
+  void _showDeleteAccountDialog() {
+    adaptive.showAdaptiveAlertDialog(
+      context: context,
+      title: 'Hapus Akun',
+      content: 'Apakah Anda yakin ingin menghapus akun? Tindakan ini tidak dapat dibatalkan dan semua data Anda akan hilang.',
+      cancelText: 'Batal',
+      confirmText: 'Hapus Akun',
+      onCancel: () {},
+      onConfirm: () async {
+        if (_userData == null) return;
+        
+        try {
+          final success = await PocketBaseService.deleteUserAccount(_userData!.id);
+          if (!mounted) return;
+          
+          if (success) {
+            _showSuccessSnackBar('Akun berhasil dihapus');
+            Navigator.pushReplacementNamed(context, '/login');
+          } else {
+            _showErrorSnackBar('Gagal menghapus akun');
+          }
+        } catch (e) {
+          _showErrorSnackBar('Error deleting account: $e');
+        }
+      },
+    );
+  }
+
   void _navigateToSettings() {
     Navigator.of(context).push(
       adaptive.adaptivePageRoute(
         builder: (context) => const SettingsScreen(),
+      ),
+    );
+  }
+
+  void _navigateToEditProfile() async {
+    final result = await Navigator.of(context).push(
+      adaptive.adaptivePageRoute(
+        builder: (context) => const EditProfileScreen(),
+      ),
+    );
+    
+    // Reload user data if profile was updated
+    if (result == true) {
+      _loadUserData();
+    }
+  }
+
+  void _navigateToHelp() {
+    Navigator.of(context).push(
+      adaptive.adaptivePageRoute(
+        builder: (context) => const HelpScreen(),
       ),
     );
   }
@@ -252,31 +321,57 @@ class ProfileScreenState extends State<ProfileScreen> with TickerProviderStateMi
                       child: CircleAvatar(
                         radius: 50,
                         backgroundColor: Colors.grey.shade300,
-                        backgroundImage: NetworkImage(
-                          _userData?['profile_image'] ??
-                              'https://randomuser.me/api/portraits/men/32.jpg',
-                        ),
+                        child: _userData?.avatar != null
+                            ? ClipOval(
+                                child: Image.network(
+                                  _userData!.getAvatarUrl(PocketBaseService.baseUrl),
+                                  width: 100,
+                                  height: 100,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    print('Error loading avatar: $error');
+                                    print('Avatar URL: ${_userData!.getAvatarUrl(PocketBaseService.baseUrl)}');
+                                    return Icon(
+                                      Icons.person,
+                                      size: 50,
+                                      color: Colors.grey.shade600,
+                                    );
+                                  },
+                                  loadingBuilder: (context, child, loadingProgress) {
+                                    if (loadingProgress == null) return child;
+                                    return const CircularProgressIndicator();
+                                  },
+                                ),
+                              )
+                            : Icon(
+                                Icons.person,
+                                size: 50,
+                                color: Colors.grey.shade600,
+                              ),
                       ),
                     ),
                     Positioned(
                       bottom: 0,
                       right: 0,
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: AppTheme.primaryColor,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.2),
-                              blurRadius: 10,
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.camera_alt,
-                          color: Colors.white,
-                          size: 16,
+                      child: GestureDetector(
+                        onTap: _navigateToEditProfile,
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primaryColor,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.2),
+                                blurRadius: 10,
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.edit,
+                            color: Colors.white,
+                            size: 16,
+                          ),
                         ),
                       ),
                     ),
@@ -284,7 +379,7 @@ class ProfileScreenState extends State<ProfileScreen> with TickerProviderStateMi
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  _userData?['name'] ?? 'Pengguna Pastry',
+                  _userData?.name ?? 'Loading...',
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -294,7 +389,7 @@ class ProfileScreenState extends State<ProfileScreen> with TickerProviderStateMi
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  _userData?['email'] ?? 'pengguna@email.com',
+                  _userData?.email ?? 'Loading...',
                   style: TextStyle(
                     fontSize: 14,
                     fontFamily: 'Roboto',
@@ -306,7 +401,6 @@ class ProfileScreenState extends State<ProfileScreen> with TickerProviderStateMi
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     _buildStatCard('Resep', '24', Icons.restaurant_menu, isDarkMode),
-                    _buildStatCard('Favorit', '12', Icons.favorite, isDarkMode),
                     _buildStatCard('Dibuat', '8', Icons.timeline, isDarkMode),
                   ],
                 ),
@@ -459,22 +553,14 @@ class ProfileScreenState extends State<ProfileScreen> with TickerProviderStateMi
                               title: 'Edit Profil',
                               isDarkMode: isDarkMode,
                               delay: 0,
-                              onTap: () => _showSuccessSnackBar('Fitur Edit Profil akan segera hadir!'),
-                            ),
-                            
-                            _buildEnhancedMenuItem(
-                              icon: PlatformHelper.shouldUseMaterial ? Icons.favorite : CupertinoIcons.heart_fill,
-                              title: 'Resep Favorit',
-                              isDarkMode: isDarkMode,
-                              delay: 1,
-                              onTap: () => _showSuccessSnackBar('Fitur Resep Favorit akan segera hadir!'),
+                              onTap: _navigateToEditProfile,
                             ),
                             
                             _buildEnhancedMenuItem(
                               icon: PlatformHelper.shouldUseMaterial ? Icons.history : CupertinoIcons.clock_fill,
                               title: 'Riwayat',
                               isDarkMode: isDarkMode,
-                              delay: 2,
+                              delay: 1,
                               onTap: () => _showSuccessSnackBar('Fitur Riwayat akan segera hadir!'),
                             ),
                             
@@ -484,7 +570,7 @@ class ProfileScreenState extends State<ProfileScreen> with TickerProviderStateMi
                                   : (PlatformHelper.shouldUseMaterial ? Icons.light_mode : CupertinoIcons.sun_max_fill),
                               title: 'Tema Aplikasi',
                               isDarkMode: isDarkMode,
-                              delay: 3,
+                              delay: 2,
                               trailing: adaptive.AdaptiveSwitch(
                                 value: isDarkMode,
                                 onChanged: (_) => themeProvider.toggleTheme(),
@@ -497,7 +583,7 @@ class ProfileScreenState extends State<ProfileScreen> with TickerProviderStateMi
                               icon: PlatformHelper.shouldUseMaterial ? Icons.settings : CupertinoIcons.settings_solid,
                               title: 'Pengaturan Lainnya',
                               isDarkMode: isDarkMode,
-                              delay: 4,
+                              delay: 3,
                               onTap: _navigateToSettings,
                             ),
                             
@@ -505,11 +591,23 @@ class ProfileScreenState extends State<ProfileScreen> with TickerProviderStateMi
                               icon: PlatformHelper.shouldUseMaterial ? Icons.help : CupertinoIcons.question_circle_fill,
                               title: 'Bantuan',
                               isDarkMode: isDarkMode,
-                              delay: 5,
-                              onTap: () => _showSuccessSnackBar('Fitur Bantuan akan segera hadir!'),
+                              delay: 4,
+                              onTap: _navigateToHelp,
                             ),
                             
                             const SizedBox(height: 20),
+                            
+                            // Delete Account
+                            _buildEnhancedMenuItem(
+                              icon: PlatformHelper.shouldUseMaterial ? Icons.delete_forever : CupertinoIcons.delete_solid,
+                              title: 'Hapus Akun',
+                              isDarkMode: isDarkMode,
+                              delay: 5,
+                              iconColor: Colors.orange,
+                              textColor: Colors.orange,
+                              trailing: null,
+                              onTap: _showDeleteAccountDialog,
+                            ),
                             
                             // Logout with special styling
                             _buildEnhancedMenuItem(

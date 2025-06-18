@@ -78,6 +78,9 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -94,12 +97,22 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
             child: TextField(
               controller: _searchController,
               onChanged: _searchArticles,
+              style: TextStyle(color: theme.textTheme.bodyLarge?.color),
               decoration: InputDecoration(
                 hintText: 'Cari artikel...',
-                prefixIcon: const Icon(Icons.search),
+                hintStyle: TextStyle(
+                  color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
+                ),
+                prefixIcon: Icon(
+                  Icons.search,
+                  color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+                ),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.clear),
+                        icon: Icon(
+                          Icons.clear,
+                          color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+                        ),
                         onPressed: () {
                           _searchController.clear();
                           _loadArticles();
@@ -107,7 +120,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
                       )
                     : null,
                 filled: true,
-                fillColor: Colors.white,
+                fillColor: isDarkMode ? theme.cardColor : Colors.white,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
@@ -129,6 +142,8 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
   }
 
   Widget _buildBody() {
+    final theme = Theme.of(context);
+    
     if (_isLoading) {
       return const Center(
         child: Column(
@@ -204,7 +219,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
             Icon(
               Icons.article_outlined,
               size: 64,
-              color: Colors.grey[400],
+              color: theme.textTheme.bodyMedium?.color?.withOpacity(0.5),
             ),
             const SizedBox(height: 16),
             Text(
@@ -212,7 +227,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Colors.grey[600],
+                color: theme.textTheme.titleMedium?.color,
               ),
             ),
             const SizedBox(height: 8),
@@ -220,7 +235,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
               'Belum ada artikel yang tersedia',
               style: TextStyle(
                 fontSize: 14,
-                color: Colors.grey[500],
+                color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
               ),
             ),
           ],
@@ -239,9 +254,13 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
   }
 
   Widget _buildArticleCard(Article article) {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 4,
+      color: theme.cardColor,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(15),
       ),
@@ -262,7 +281,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
                   if (loadingProgress == null) return child;
                   return Container(
                     height: 200,
-                    color: Colors.grey[200],
+                    color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
                     child: Center(
                       child: CircularProgressIndicator(
                         value: loadingProgress.expectedTotalBytes != null
@@ -277,16 +296,23 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
                 errorBuilder: (context, error, stackTrace) {
                   return Container(
                     height: 200,
-                    color: Colors.grey[300],
-                    child: const Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.image_not_supported, size: 50),
-                          SizedBox(height: 8),
-                          Text('Gambar tidak dapat dimuat'),
-                        ],
-                      ),
+                    color: isDarkMode ? Colors.grey[800] : Colors.grey[300],
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.image_not_supported, 
+                          size: 50,
+                          color: theme.textTheme.bodyMedium?.color?.withOpacity(0.5),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Gambar tidak dapat dimuat',
+                          style: TextStyle(
+                            color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+                          ),
+                        ),
+                      ],
                     ),
                   );
                 },
@@ -321,14 +347,14 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
                       Icon(
                         Icons.access_time,
                         size: 16,
-                        color: Colors.grey[600],
+                        color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
                       ),
                       const SizedBox(width: 4),
                       Text(
                         article.readTime,
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey[600],
+                          color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
                         ),
                       ),
                     ],
@@ -336,9 +362,10 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
                   const SizedBox(height: 12),
                   Text(
                     article.title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
+                      color: theme.textTheme.titleMedium?.color,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -346,7 +373,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
                     article.description,
                     style: TextStyle(
                       fontSize: 14,
-                      color: Colors.grey[600],
+                      color: theme.textTheme.bodyMedium?.color?.withOpacity(0.8),
                       height: 1.4,
                     ),
                     maxLines: 3,
@@ -360,7 +387,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
                         'Dibuat: ${_formatDate(article.created)}',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey[500],
+                          color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
                         ),
                       ),
                       TextButton.icon(
@@ -400,15 +427,69 @@ class ArticleDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          article.category,
-          style: const TextStyle(fontWeight: FontWeight.bold),
+      backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(80),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: isDarkMode ? [
+                AppTheme.primaryColor.withOpacity(0.8),
+                AppTheme.primaryColor.withOpacity(0.6),
+                Colors.deepOrange.withOpacity(0.4),
+              ] : [
+                AppTheme.primaryColor,
+                AppTheme.primaryColor.withOpacity(0.8),
+                Colors.deepOrange.withOpacity(0.6),
+              ],
+            ),
+          ),
+          child: Stack(
+            children: [
+              Positioned(
+                top: -30,
+                right: -30,
+                child: Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withOpacity(isDarkMode ? 0.05 : 0.1),
+                  ),
+                ),
+              ),
+              Positioned(
+                bottom: -20,
+                left: -20,
+                child: Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withOpacity(isDarkMode ? 0.02 : 0.05),
+                  ),
+                ),
+              ),
+              SafeArea(
+                child: AppBar(
+                  title: Text(
+                    article.category,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  backgroundColor: Colors.transparent,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                ),
+              ),
+            ],
+          ),
         ),
-        backgroundColor: AppTheme.primaryColor,
-        foregroundColor: Colors.white,
-        elevation: 0,
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -423,7 +504,7 @@ class ArticleDetailScreen extends StatelessWidget {
                 if (loadingProgress == null) return child;
                 return Container(
                   height: 250,
-                  color: Colors.grey[200],
+                  color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
                   child: Center(
                     child: CircularProgressIndicator(
                       value: loadingProgress.expectedTotalBytes != null
@@ -438,16 +519,23 @@ class ArticleDetailScreen extends StatelessWidget {
               errorBuilder: (context, error, stackTrace) {
                 return Container(
                   height: 250,
-                  color: Colors.grey[300],
-                  child: const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.image_not_supported, size: 50),
-                        SizedBox(height: 8),
-                        Text('Gambar tidak dapat dimuat'),
-                      ],
-                    ),
+                  color: isDarkMode ? Colors.grey[800] : Colors.grey[300],
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.image_not_supported, 
+                        size: 50,
+                        color: theme.textTheme.bodyMedium?.color?.withOpacity(0.5),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Gambar tidak dapat dimuat',
+                        style: TextStyle(
+                          color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+                        ),
+                      ),
+                    ],
                   ),
                 );
               },
@@ -481,14 +569,14 @@ class ArticleDetailScreen extends StatelessWidget {
                       Icon(
                         Icons.access_time,
                         size: 18,
-                        color: Colors.grey[600],
+                        color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
                       ),
                       const SizedBox(width: 6),
                       Text(
                         article.readTime,
                         style: TextStyle(
                           fontSize: 14,
-                          color: Colors.grey[600],
+                          color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -497,10 +585,11 @@ class ArticleDetailScreen extends StatelessWidget {
                   const SizedBox(height: 20),
                   Text(
                     article.title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
                       height: 1.3,
+                      color: theme.textTheme.titleLarge?.color,
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -508,7 +597,7 @@ class ArticleDetailScreen extends StatelessWidget {
                     article.description,
                     style: TextStyle(
                       fontSize: 16,
-                      color: Colors.grey[700],
+                      color: theme.textTheme.bodyLarge?.color?.withOpacity(0.8),
                       height: 1.5,
                       fontStyle: FontStyle.italic,
                     ),
@@ -519,41 +608,41 @@ class ArticleDetailScreen extends StatelessWidget {
                       Icon(
                         Icons.calendar_today,
                         size: 16,
-                        color: Colors.grey[500],
+                        color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
                       ),
                       const SizedBox(width: 4),
                       Text(
                         'Dibuat: ${_formatDate(article.created)}',
                         style: TextStyle(
                           fontSize: 14,
-                          color: Colors.grey[500],
+                          color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
                         ),
                       ),
                       const SizedBox(width: 16),
                       Icon(
                         Icons.update,
                         size: 16,
-                        color: Colors.grey[500],
+                        color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
                       ),
                       const SizedBox(width: 4),
                       Text(
                         'Diperbarui: ${_formatDate(article.updated)}',
                         style: TextStyle(
                           fontSize: 14,
-                          color: Colors.grey[500],
+                          color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 24),
-                  const Divider(),
+                  Divider(color: theme.dividerColor),
                   const SizedBox(height: 24),
                   Text(
                     article.content,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
                       height: 1.6,
-                      color: Colors.black87,
+                      color: theme.textTheme.bodyLarge?.color,
                     ),
                   ),
                   const SizedBox(height: 40),

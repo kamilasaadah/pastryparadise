@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/material.dart';
 import '../models/recipe.dart';
 import '../theme/app_theme.dart';
@@ -15,13 +17,13 @@ class RecipeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final textColor = isDarkMode ? AppTheme.darkTextColor : Colors.grey[800];
-    final mutedTextColor = isDarkMode ? AppTheme.darkMutedTextColor : Colors.grey[600];
+    final theme = Theme.of(context);
     
     return Card(
       margin: const EdgeInsets.only(right: 12.0, bottom: 12.0),
       clipBehavior: Clip.antiAlias,
       elevation: 2,
+      color: theme.cardColor,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
@@ -40,9 +42,11 @@ class RecipeCard extends StatelessWidget {
                   errorBuilder: (context, error, stackTrace) {
                     return Container(
                       height: 150,
-                      color: Colors.grey[300],
-                      child: const Center(
-                        child: Icon(Icons.image_not_supported, size: 50),
+                      color: isDarkMode ? Colors.grey[800] : Colors.grey[300],
+                      child: Icon(
+                        Icons.image_not_supported, 
+                        size: 50,
+                        color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
                       ),
                     );
                   },
@@ -51,17 +55,36 @@ class RecipeCard extends StatelessWidget {
                   top: 10,
                   right: 10,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
-                      color: Colors.black.withAlpha(153), // 0.6 * 255 ≈ 153
+                      color: Recipe.getDifficultyColor(recipe.difficulty),
                       borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
-                    child: Text(
-                      recipe.difficulty,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                      ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Recipe.getDifficultyIcon(recipe.difficulty),
+                          size: 12,
+                          color: Colors.white,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          recipe.difficulty,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -77,7 +100,7 @@ class RecipeCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: textColor,
+                      color: theme.textTheme.titleLarge?.color,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -88,19 +111,23 @@ class RecipeCard extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: mutedTextColor,
+                      color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
                       fontSize: 12,
                     ),
                   ),
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      Icon(Icons.timer, size: 14, color: mutedTextColor),
+                      Icon(
+                        Icons.timer, 
+                        size: 14, 
+                        color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+                      ),
                       const SizedBox(width: 4),
                       Text(
-                        '${recipe.prepTime + recipe.cookTime} menit',
+                        '${recipe.prepTime + recipe.cookTime.toInt()} menit',
                         style: TextStyle(
-                          color: mutedTextColor,
+                          color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
                           fontSize: 12,
                         ),
                       ),
@@ -108,7 +135,9 @@ class RecipeCard extends StatelessWidget {
                       Icon(
                         recipe.isFavorite ? Icons.favorite : Icons.favorite_border, 
                         size: 14, 
-                        color: recipe.isFavorite ? AppTheme.primaryColor : mutedTextColor
+                        color: recipe.isFavorite 
+                            ? AppTheme.primaryColor 
+                            : theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
                       ),
                     ],
                   ),

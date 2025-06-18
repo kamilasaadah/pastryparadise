@@ -63,20 +63,70 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Resep Favorit',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: AppTheme.primaryColor,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadFavoriteRecipes,
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(80),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: Theme.of(context).brightness == Brightness.dark ? [
+                AppTheme.primaryColor.withOpacity(0.8),
+                AppTheme.primaryColor.withOpacity(0.6),
+                Colors.deepOrange.withOpacity(0.4),
+              ] : [
+                AppTheme.primaryColor,
+                AppTheme.primaryColor.withOpacity(0.8),
+                Colors.deepOrange.withOpacity(0.6),
+              ],
+            ),
           ),
-        ],
+          child: Stack(
+            children: [
+              Positioned(
+                top: -30,
+                right: -30,
+                child: Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withOpacity(Theme.of(context).brightness == Brightness.dark ? 0.05 : 0.1),
+                  ),
+                ),
+              ),
+              Positioned(
+                bottom: -20,
+                left: -20,
+                child: Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withOpacity(Theme.of(context).brightness == Brightness.dark ? 0.02 : 0.05),
+                  ),
+                ),
+              ),
+              SafeArea(
+                child: AppBar(
+                  title: const Text(
+                    'Resep Favorit',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  backgroundColor: Colors.transparent,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  actions: [
+                    IconButton(
+                      icon: const Icon(Icons.refresh),
+                      onPressed: _loadFavoriteRecipes,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

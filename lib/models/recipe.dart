@@ -1,6 +1,7 @@
 import 'dart:developer' as developer;
+import 'package:flutter/material.dart';
 import 'ingredient.dart';
-import 'step.dart';
+import 'step.dart' as model_step;
 
 class Recipe {
   final String id;
@@ -14,7 +15,7 @@ class Recipe {
   final String? userId;
   final String? categoryId;
   final List<Ingredient> ingredients;
-  final List<Step> steps;
+  final List<model_step.Step> steps;
   bool isFavorite;
 
   Recipe({
@@ -36,7 +37,7 @@ class Recipe {
   factory Recipe.fromJson(Map<String, dynamic> json) {
     const String pocketBaseUrl = String.fromEnvironment(
       'POCKETBASE_URL',
-      defaultValue: 'http://localhost:8090',
+      defaultValue: 'http://127.0.0.1:8090',
     );
     final String imageFileName = json['image']?.toString() ?? '';
     final String recordId = json['id']?.toString() ?? '';
@@ -44,47 +45,31 @@ class Recipe {
         ? '$pocketBaseUrl/api/files/recipes/$recordId/$imageFileName'
         : 'https://via.placeholder.com/150';
 
-    developer.log('Recipe JSON: $json', name: 'Recipe.fromJson');
-    developer.log('Image Field: $imageFileName', name: 'Recipe.fromJson');
-    developer.log('ID Field: $recordId', name: 'Recipe.fromJson');
-    developer.log('Constructed Image URL: $image', name: 'Recipe.fromJson');
+    // Debug logging
+    developer.log('=== RECIPE JSON DEBUG ===', name: 'Recipe.fromJson');
+    developer.log('Title: ${json['title']}', name: 'Recipe.fromJson');
+    developer.log('Description: ${json['description']}', name: 'Recipe.fromJson');
+    developer.log('Difficulty RAW: ${json['difficulty']}', name: 'Recipe.fromJson');
 
-    try {
-      return Recipe(
-        id: json['id']?.toString() ?? '',
-        title: json['title']?.toString() ?? 'Resep Tanpa Nama',
-        description: json['description']?.toString() ?? '',
-        image: image,
-        prepTime: int.tryParse(json['prepTime']?.toString() ?? '0') ?? 0,
-        cookTime: double.tryParse(json['cookTime']?.toString() ?? '0') ?? 0.0,
-        servings: double.tryParse(json['servings']?.toString() ?? '1') ?? 1.0,
-        difficulty: json['difficulty']?.toString() ?? 'Medium',
-        userId: json['user_id']?.toString(),
-        categoryId: json['id_category']?.toString(),
-        ingredients: (json['expand']?['ingredients'] as List<dynamic>?)
-            ?.map((item) => Ingredient.fromJson(item as Map<String, dynamic>))
-            .toList() ?? [],
-        steps: (json['expand']?['steps'] as List<dynamic>?)
-            ?.map((item) => Step.fromJson(item as Map<String, dynamic>))
-            .toList() ?? [],
-        isFavorite: false, // Akan diatur oleh getFavoriteRecipes
-      );
-    } catch (e) {
-      developer.log('Error parsing Recipe: $e', name: 'Recipe.fromJson');
-      return Recipe(
-        id: '',
-        title: 'Error',
-        description: 'Gagal memuat resep',
-        image: 'https://via.placeholder.com/150',
-        prepTime: 0,
-        cookTime: 0.0,
-        servings: 1.0,
-        difficulty: 'Medium',
-        ingredients: [],
-        steps: [],
-        isFavorite: false,
-      );
-    }
+    return Recipe(
+      id: json['id']?.toString() ?? '',
+      title: json['title']?.toString() ?? 'Resep Tanpa Nama',
+      description: json['description']?.toString() ?? '',
+      image: image,
+      prepTime: int.tryParse(json['prepTime']?.toString() ?? '0') ?? 0,
+      cookTime: double.tryParse(json['cookTime']?.toString() ?? '0') ?? 0.0,
+      servings: double.tryParse(json['servings']?.toString() ?? '1') ?? 1.0,
+      difficulty: json['difficulty']?.toString() ?? 'Unknown', // SAMA PERSIS SEPERTI DESCRIPTION!
+      userId: json['user_id']?.toString(),
+      categoryId: json['id_category']?.toString(),
+      ingredients: (json['expand']?['ingredients'] as List<dynamic>?)
+          ?.map((item) => Ingredient.fromJson(item as Map<String, dynamic>))
+          .toList() ?? [],
+      steps: (json['expand']?['steps'] as List<dynamic>?)
+          ?.map((item) => model_step.Step.fromJson(item as Map<String, dynamic>))
+          .toList() ?? [],
+      isFavorite: false,
+    );
   }
 
   Map<String, dynamic> toJson() {
@@ -105,7 +90,6 @@ class Recipe {
     };
   }
 
-  // Menambahkan metode copyWith
   Recipe copyWith({
     String? id,
     String? title,
@@ -118,7 +102,7 @@ class Recipe {
     String? userId,
     String? categoryId,
     List<Ingredient>? ingredients,
-    List<Step>? steps,
+    List<model_step.Step>? steps,
     bool? isFavorite,
   }) {
     return Recipe(
@@ -136,5 +120,32 @@ class Recipe {
       steps: steps ?? this.steps,
       isFavorite: isFavorite ?? this.isFavorite,
     );
+  }
+
+  // Helper methods untuk styling (opsional)
+  static Color getDifficultyColor(String difficulty) {
+    switch (difficulty) {
+      case 'Easy':
+        return Colors.green;
+      case 'Medium':
+        return Colors.orange;
+      case 'Hard':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  static IconData getDifficultyIcon(String difficulty) {
+    switch (difficulty) {
+      case 'Easy':
+        return Icons.sentiment_satisfied;
+      case 'Medium':
+        return Icons.sentiment_neutral;
+      case 'Hard':
+        return Icons.sentiment_dissatisfied;
+      default:
+        return Icons.help_outline;
+    }
   }
 }

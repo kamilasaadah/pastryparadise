@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/recipe.dart';
+import '../models/category.dart' as my_models;
 import '../models/review.dart';
 import '../models/tip.dart';
 import '../models/ingredient.dart';
@@ -150,7 +151,26 @@ class DatabaseHelper {
     debugPrint('User data saved: ${userData['id']}');
   }
 
-  // Helper method to check if recipe is favorited by current user
+  // NEW: Get all categories from PocketBase
+  Future<List<my_models.Category>> getCategories() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$_pocketBaseUrl/api/collections/category/records'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      debugPrint('Get categories status: ${response.statusCode} - ${response.body}');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final List<dynamic> items = data['items'] ?? [];
+        return items.map((item) => my_models.Category.fromJson(item)).toList();
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Error fetching categories: $e');
+      return [];
+    }
+  }
 
   // Helper method to set favorite status for multiple recipes
   Future<List<Recipe>> _setFavoriteStatus(List<Recipe> recipes) async {
@@ -201,16 +221,32 @@ class DatabaseHelper {
       };
 
       final response = await http.get(
-        Uri.parse('$_pocketBaseUrl/api/collections/recipes/records?expand=ingredients,steps'),
+        Uri.parse('$_pocketBaseUrl/api/collections/recipes/records?expand=ingredients,steps,id_category'),
         headers: headers,
       );
 
-      debugPrint('Get recipes status: ${response.statusCode} - ${response.body}');
+      debugPrint('=== GET RECIPES DEBUG ===');
+      debugPrint('Get recipes status: ${response.statusCode}');
+      debugPrint('Get recipes response body: ${response.body}');
+      
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        debugPrint('Parsed data: $data');
         final List<dynamic> items = data['items'] ?? [];
+        
+        // Debug setiap item untuk melihat field difficulty
+        debugPrint('=== INDIVIDUAL RECIPE DEBUG ===');
+        for (int i = 0; i < items.length; i++) {
+          final item = items[i];
+          debugPrint('Recipe $i: ${item['title']} - Difficulty: "${item['difficulty']}" (${item['difficulty'].runtimeType})');
+        }
+        
         final recipes = items.map((item) => Recipe.fromJson(item)).toList();
+        
+        // Debug hasil parsing
+        debugPrint('=== PARSED RECIPES DEBUG ===');
+        for (int i = 0; i < recipes.length; i++) {
+          debugPrint('Parsed Recipe $i: ${recipes[i].title} - Difficulty: "${recipes[i].difficulty}"');
+        }
         
         // Set favorite status for all recipes
         return await _setFavoriteStatus(recipes);
@@ -222,7 +258,7 @@ class DatabaseHelper {
     }
   }
 
-  Future<List<Recipe>> getRecipesByCategory(String category) async {
+  Future<List<Recipe>> getRecipesByCategory(String categoryId) async {
     try {
       final authToken = await _getAuthToken();
       final headers = {
@@ -230,12 +266,12 @@ class DatabaseHelper {
         if (authToken != null) 'Authorization': 'Bearer $authToken',
       };
 
-      if (category == 'Semua') {
+      if (categoryId == 'Semua') {
         return await getRecipes();
       }
 
       final response = await http.get(
-        Uri.parse('$_pocketBaseUrl/api/collections/recipes/records?filter=id_category="$category"&expand=ingredients,steps'),
+        Uri.parse('$_pocketBaseUrl/api/collections/recipes/records?filter=id_category="$categoryId"&expand=ingredients,steps,id_category'),
         headers: headers,
       );
 
@@ -264,15 +300,32 @@ class DatabaseHelper {
       };
 
       final response = await http.get(
-        Uri.parse('$_pocketBaseUrl/api/collections/recipes/records?sort=-created&perPage=$limit&expand=ingredients,steps'),
+        Uri.parse('$_pocketBaseUrl/api/collections/recipes/records?sort=-created&perPage=$limit&expand=ingredients,steps,id_category'),
         headers: headers,
       );
 
-      debugPrint('Get newest recipes status: ${response.statusCode} - ${response.body}');
+      debugPrint('=== GET NEWEST RECIPES DEBUG ===');
+      debugPrint('Get newest recipes status: ${response.statusCode}');
+      debugPrint('Get newest recipes response: ${response.body}');
+      
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final List<dynamic> items = data['items'] ?? [];
+        
+        // Debug setiap item untuk melihat field difficulty
+        debugPrint('=== NEWEST RECIPES INDIVIDUAL DEBUG ===');
+        for (int i = 0; i < items.length; i++) {
+          final item = items[i];
+          debugPrint('Newest Recipe $i: ${item['title']} - Difficulty: "${item['difficulty']}" (${item['difficulty'].runtimeType})');
+        }
+        
         final recipes = items.map((item) => Recipe.fromJson(item)).toList();
+        
+        // Debug hasil parsing
+        debugPrint('=== NEWEST PARSED RECIPES DEBUG ===');
+        for (int i = 0; i < recipes.length; i++) {
+          debugPrint('Newest Parsed Recipe $i: ${recipes[i].title} - Difficulty: "${recipes[i].difficulty}"');
+        }
         
         // Set favorite status for all recipes
         return await _setFavoriteStatus(recipes);
@@ -336,7 +389,7 @@ class DatabaseHelper {
         for (String recipeId in recipeIds) {
           try {
             final recipeResponse = await http.get(
-              Uri.parse('$_pocketBaseUrl/api/collections/recipes/records/$recipeId?expand=ingredients,steps'),
+              Uri.parse('$_pocketBaseUrl/api/collections/recipes/records/$recipeId?expand=ingredients,steps,id_category'),
               headers: headers,
             );
 
@@ -434,7 +487,7 @@ class DatabaseHelper {
       };
 
       final response = await http.get(
-        Uri.parse('$_pocketBaseUrl/api/collections/recipes/records?filter=title~"$query"||description~"$query"&expand=ingredients,steps'),
+        Uri.parse('$_pocketBaseUrl/api/collections/recipes/records?filter=title~"$query"||description~"$query"&expand=ingredients,steps,id_category'),
         headers: headers,
       );
 

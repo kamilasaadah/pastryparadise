@@ -4,13 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'dart:developer' as developer;
 import '../models/recipe.dart';
+import '../models/category.dart';
 import '../services/database_helper.dart';
 import '../utils/platform_helper.dart';
 import '../widgets/adaptive_widgets.dart';
 import 'recipe_detail_screen.dart';
 
 class CategoryScreen extends StatefulWidget {
-  final String category;
+  final String category; // This can be category ID or "Semua"
 
   const CategoryScreen({Key? key, required this.category}) : super(key: key);
 
@@ -20,6 +21,7 @@ class CategoryScreen extends StatefulWidget {
 
 class _CategoryScreenState extends State<CategoryScreen> {
   List<Recipe> _recipes = [];
+  String _categoryTitle = '';
   bool _isLoading = true;
   String _selectedView = 'grid'; // 'grid' or 'list'
 
@@ -39,9 +41,23 @@ class _CategoryScreenState extends State<CategoryScreen> {
       imageCache.clearLiveImages();
       developer.log('Cleared image cache', name: 'CategoryScreen');
 
-      final recipes = widget.category == 'Semua'
-          ? await DatabaseHelper.instance.getRecipes()
-          : await DatabaseHelper.instance.getRecipesByCategory(widget.category);
+      List<Recipe> recipes;
+      
+      if (widget.category == 'Semua') {
+        recipes = await DatabaseHelper.instance.getRecipes();
+        _categoryTitle = 'Semua Kategori';
+      } else {
+        recipes = await DatabaseHelper.instance.getRecipesByCategory(widget.category);
+        
+        // Get category title
+        final categories = await DatabaseHelper.instance.getCategories();
+        final category = categories.firstWhere(
+          (cat) => cat.id == widget.category,
+          orElse: () => Category(id: widget.category, title: widget.category),
+        );
+        _categoryTitle = category.title;
+      }
+
       final favorites = await DatabaseHelper.instance.getFavoriteRecipes();
       if (!mounted) return;
 
@@ -412,7 +428,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
   Widget build(BuildContext context) {
     return AdaptiveScaffold(
       appBar: AdaptiveAppBar(
-        title: widget.category == 'Semua' ? 'Semua Kategori' : widget.category,
+        title: _categoryTitle.isNotEmpty ? _categoryTitle : 'Kategori',
         leading: IconButton(
           icon: Icon(
             PlatformHelper.shouldUseMaterial ? Icons.arrow_back : CupertinoIcons.back,
