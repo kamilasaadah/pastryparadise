@@ -33,7 +33,10 @@ class ReviewCardState extends State<ReviewCard> with TickerProviderStateMixin {
   // ignore: unused_field
   bool _isModalOpen = false;
   String _userName = '';
+  String? _userAvatarUrl; // NEW: Add avatar URL
   double _editRating = 0.0;
+  bool _isCurrentUserReview = false; // Track if this is current user's review
+  bool _isLoadingUserCheck = true; // Loading state for user check
 
   @override
   void initState() {
@@ -56,15 +59,70 @@ class ReviewCardState extends State<ReviewCard> with TickerProviderStateMixin {
     );
     
     _animationController.forward();
-    _loadUserName();
+    _loadUserInfo(); // UPDATED: Load both name and avatar
+    _checkIfCurrentUserReview(); // Check if this is current user's review
   }
 
-  Future<void> _loadUserName() async {
-    final name = await DatabaseHelper.instance.getUserName(widget.review.userId);
-    if (mounted) {
-      setState(() {
-        _userName = name;
-      });
+  // UPDATED: Load both user name and avatar
+  Future<void> _loadUserInfo() async {
+    try {
+      debugPrint('=== LOADING USER INFO ===');
+      debugPrint('Review User ID: ${widget.review.userId}');
+
+      final userInfo = await DatabaseHelper.instance.getUserInfo(widget.review.userId);
+
+      // If we get "Unknown User", try once more after a short delay
+      if (userInfo['name'] == 'Unknown User') {
+        debugPrint('First attempt returned Unknown User, retrying...');
+        await Future.delayed(const Duration(milliseconds: 500));
+        final retryInfo = await DatabaseHelper.instance.getUserInfo(widget.review.userId);
+        userInfo['name'] = retryInfo['name'];
+        userInfo['avatar'] = retryInfo['avatar'];
+      }
+
+      debugPrint('Final user info: ${userInfo['name']}, avatar: ${userInfo['avatar']} for userId: ${widget.review.userId}');
+
+      if (mounted) {
+        setState(() {
+          _userName = userInfo['name'] ?? 'Unknown User';
+          _userAvatarUrl = userInfo['avatar'];
+        });
+      }
+    } catch (e) {
+      debugPrint('Error in _loadUserInfo: $e');
+      if (mounted) {
+        setState(() {
+          _userName = 'Unknown User';
+          _userAvatarUrl = null;
+        });
+      }
+    }
+  }
+
+  // Check if the current logged-in user is the author of this review
+  Future<void> _checkIfCurrentUserReview() async {
+    try {
+      final currentUser = await DatabaseHelper.instance.getCurrentUser();
+      if (mounted) {
+        setState(() {
+          _isCurrentUserReview = currentUser != null && currentUser['id'] == widget.review.userId;
+          _isLoadingUserCheck = false;
+        });
+        
+        // Debug logging
+        debugPrint('=== REVIEW PERMISSION CHECK ===');
+        debugPrint('Current User ID: ${currentUser?['id']}');
+        debugPrint('Review User ID: ${widget.review.userId}');
+        debugPrint('Is Current User Review: $_isCurrentUserReview');
+      }
+    } catch (e) {
+      debugPrint('Error checking user review permission: $e');
+      if (mounted) {
+        setState(() {
+          _isCurrentUserReview = false;
+          _isLoadingUserCheck = false;
+        });
+      }
     }
   }
 
@@ -428,19 +486,14 @@ class ReviewCardState extends State<ReviewCard> with TickerProviderStateMixin {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header with user info and actions
+                // Header with user info and conditional actions
                 Row(
                   children: [
+                    // UPDATED: Avatar with Image.network support
                     Container(
                       width: 48,
                       height: 48,
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            AppTheme.primaryColor.withOpacity(0.8),
-                            AppTheme.primaryColor.withOpacity(0.6),
-                          ],
-                        ),
                         borderRadius: BorderRadius.circular(24),
                         boxShadow: [
                           BoxShadow(
@@ -450,15 +503,86 @@ class ReviewCardState extends State<ReviewCard> with TickerProviderStateMixin {
                           ),
                         ],
                       ),
-                      child: Center(
-                        child: Text(
-                          _userName.isNotEmpty ? _userName[0].toUpperCase() : '?',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(24),
+                        child: _userAvatarUrl != null && _userAvatarUrl!.isNotEmpty
+                            ? Image.network(
+                                _userAvatarUrl!,
+                                width: 48,
+                                height: 48,
+                                fit: BoxFit.cover,
+                                loadingBuilder: (context, child, loadingProgress) {
+                                  if (loadingProgress == null) return child;
+                                  return Container(
+                                    width: 48,
+                                    height: 48,
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          AppTheme.primaryColor.withOpacity(0.8),
+                                          AppTheme.primaryColor.withOpacity(0.6),
+                                        ],
+                                      ),
+                                      borderRadius: BorderRadius.circular(24),
+                                    ),
+                                    child: const Center(
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                      ),
+                                    ),
+                                  );
+                                },
+                                errorBuilder: (context, error, stackTrace) {
+                                  debugPrint('Avatar failed to load: $_userAvatarUrl, Error: $error');
+                                  return Container(
+                                    width: 48,
+                                    height: 48,
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          AppTheme.primaryColor.withOpacity(0.8),
+                                          AppTheme.primaryColor.withOpacity(0.6),
+                                        ],
+                                      ),
+                                      borderRadius: BorderRadius.circular(24),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        _userName.isNotEmpty ? _userName[0].toUpperCase() : '?',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              )
+                            : Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      AppTheme.primaryColor.withOpacity(0.8),
+                                      AppTheme.primaryColor.withOpacity(0.6),
+                                    ],
+                                  ),
+                                  borderRadius: BorderRadius.circular(24),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    _userName.isNotEmpty ? _userName[0].toUpperCase() : '?',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
                       ),
                     ),
                     const SizedBox(width: 16),
@@ -485,41 +609,58 @@ class ReviewCardState extends State<ReviewCard> with TickerProviderStateMixin {
                         ],
                       ),
                     ),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: theme.cardColor.withOpacity(0.5),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(
-                              Icons.edit_rounded,
-                              size: 20,
-                              color: Colors.blue,
+                    // Only show edit/delete buttons if this is current user's review
+                    if (!_isLoadingUserCheck && _isCurrentUserReview)
+                      Container(
+                        decoration: BoxDecoration(
+                          color: theme.cardColor.withOpacity(0.5),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(
+                                Icons.edit_rounded,
+                                size: 20,
+                                color: Colors.blue,
+                              ),
+                              onPressed: () {
+                                HapticFeedback.lightImpact();
+                                _showEditDialog();
+                              },
+                              tooltip: 'Edit Review',
                             ),
-                            onPressed: () {
-                              HapticFeedback.lightImpact();
-                              _showEditDialog();
-                            },
-                            tooltip: 'Edit Review',
-                          ),
-                          IconButton(
-                            icon: const Icon(
-                              Icons.delete_rounded,
-                              size: 20,
-                              color: Colors.red,
+                            IconButton(
+                              icon: const Icon(
+                                Icons.delete_rounded,
+                                size: 20,
+                                color: Colors.red,
+                              ),
+                              onPressed: () {
+                                HapticFeedback.lightImpact();
+                                _showDeleteConfirmation();
+                              },
+                              tooltip: 'Delete Review',
                             ),
-                            onPressed: () {
-                              HapticFeedback.lightImpact();
-                              _showDeleteConfirmation();
-                            },
-                            tooltip: 'Delete Review',
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
+                    // Show loading indicator while checking permissions
+                    if (_isLoadingUserCheck)
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        child: SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              theme.textTheme.bodyMedium?.color?.withOpacity(0.5) ?? Colors.grey,
+                            ),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
                 

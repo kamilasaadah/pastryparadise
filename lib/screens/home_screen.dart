@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import 'dart:async';
 import '../models/recipe.dart';
 import '../models/category.dart';
 import '../services/database_helper.dart';
@@ -41,12 +42,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // Search controller
   final TextEditingController _searchController = TextEditingController();
 
+  Timer? _carouselTimer;
+  bool _isUserInteracting = false;
+
   @override
   void initState() {
     super.initState();
     _initAnimations();
-    _carouselController = PageController(initialPage: 1, viewportFraction: 0.8);
+    _carouselController = PageController(initialPage: 1000, viewportFraction: 0.8); // Start dari tengah untuk infinite effect
     _loadData();
+    _startAutoScroll(); // Tambahkan ini
   }
 
   void _initAnimations() {
@@ -77,12 +82,37 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     ));
   }
 
+  void _startAutoScroll() {
+    _carouselTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
+      if (!_isUserInteracting && _carouselController.hasClients) {
+        _carouselController.nextPage(
+          duration: const Duration(milliseconds: 500),
+          curve: Curves.easeInOut,
+        );
+      }
+    });
+  }
+
+  void _stopAutoScroll() {
+    _carouselTimer?.cancel();
+  }
+
+  void _resumeAutoScroll() {
+    _stopAutoScroll();
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted && !_isUserInteracting) {
+        _startAutoScroll();
+      }
+    });
+  }
+
   @override
   void dispose() {
     _animationController.dispose();
     _cardAnimationController.dispose();
     _carouselController.dispose();
     _searchController.dispose();
+    _carouselTimer?.cancel(); // Tambahkan ini
     super.dispose();
   }
 
@@ -156,7 +186,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  Future<void> _performSearch(String query) async {
+  Future<void> _performSearch() async {
+    final query = _searchController.text.trim();
+    
     if (query.isEmpty) {
       setState(() {
         _searchQuery = '';
@@ -185,6 +217,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       });
       _showErrorSnackBar('Error searching recipes: $e');
     }
+  }
+
+  void _clearSearch() {
+    _searchController.clear();
+    setState(() {
+      _searchQuery = '';
+      _filteredRecipes = _recipes;
+    });
   }
 
   Widget _buildGradientHeader() {
@@ -314,18 +354,24 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ),
       child: Row(
         children: [
-          // Icon search dengan background
+          // Search button with pink background
           Container(
             margin: const EdgeInsets.all(6),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
+            child: Material(
               color: AppTheme.primaryColor,
               borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Icon(
-              Icons.search_rounded,
-              color: Colors.white,
-              size: 18,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: _performSearch, // Search only when button is pressed
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  child: const Icon(
+                    Icons.search_rounded,
+                    color: Colors.white,
+                    size: 18,
+                  ),
+                ),
+              ),
             ),
           ),
           // TextField
@@ -350,21 +396,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   horizontal: 16,
                 ),
               ),
-              onChanged: _performSearch,
+              onSubmitted: (_) => _performSearch(), // Also search when Enter is pressed
+              // Remove onChanged - no more auto search!
             ),
           ),
           // Clear button
-          if (_searchQuery.isNotEmpty)
+          if (_searchController.text.isNotEmpty)
             IconButton(
               icon: Icon(
                 Icons.clear_rounded,
                 size: 20,
                 color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
               ),
-              onPressed: () {
-                _searchController.clear();
-                _performSearch('');
-              },
+              onPressed: _clearSearch,
             ),
         ],
       ),
@@ -372,49 +416,58 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildCarousel() {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
-    final carouselItems = [
-      {
-        'title': 'Buat Pastry\nTerbaik! 🥐',
-        'subtitle': 'Resep premium untuk hasil sempurna',
-        'gradient': isDarkMode 
-            ? [AppTheme.primaryColor.withOpacity(0.8), Colors.orange.withOpacity(0.8)]
-            : [AppTheme.primaryColor, Colors.orange],
-        'icon': Icons.cake,
-      },
-      {
-        'title': 'Pastry Paradise\nAwaits! ✨',
-        'subtitle': 'Temukan surga pastry di sini',
-        'gradient': isDarkMode 
-            ? [Colors.purple.withOpacity(0.8), Colors.pink.withOpacity(0.8)]
-            : [Colors.purple, Colors.pink],
-        'icon': Icons.star,
-      },
-      {
-        'title': 'Master Chef\nSecrets! 👨‍🍳',
-        'subtitle': 'Tips dan trik dari para ahli',
-        'gradient': isDarkMode 
-            ? [Colors.teal.withOpacity(0.8), Colors.cyan.withOpacity(0.8)]
-            : [Colors.teal, Colors.cyan],
-        'icon': Icons.local_dining,
-      },
-    ];
+  final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+  
+  final carouselItems = [
+    {
+      'title': 'Buat Pastry\nTerbaik! 🥐',
+      'subtitle': 'Resep premium untuk hasil sempurna',
+      'gradient': isDarkMode 
+          ? [AppTheme.primaryColor.withOpacity(0.8), Colors.orange.withOpacity(0.8)]
+          : [AppTheme.primaryColor, Colors.orange],
+      'icon': Icons.cake,
+    },
+    {
+      'title': 'Pastry Paradise\nAwaits! ✨',
+      'subtitle': 'Temukan surga pastry di sini',
+      'gradient': isDarkMode 
+          ? [Colors.purple.withOpacity(0.8), Colors.pink.withOpacity(0.8)]
+          : [Colors.purple, Colors.pink],
+      'icon': Icons.star,
+    },
+    {
+      'title': 'Master Chef\nSecrets! 👨‍🍳',
+      'subtitle': 'Tips dan trik dari para ahli',
+      'gradient': isDarkMode 
+          ? [Colors.teal.withOpacity(0.8), Colors.cyan.withOpacity(0.8)]
+          : [Colors.teal, Colors.cyan],
+      'icon': Icons.local_dining,
+    },
+  ];
 
-    return Container(
-      height: 180,
-      margin: const EdgeInsets.only(bottom: 30),
+  return Container(
+    height: 180,
+    margin: const EdgeInsets.only(bottom: 30),
+    child: GestureDetector(
+      onPanStart: (_) {
+        _isUserInteracting = true;
+        _stopAutoScroll();
+      },
+      onPanEnd: (_) {
+        _isUserInteracting = false;
+        _resumeAutoScroll();
+      },
       child: PageView.builder(
         controller: _carouselController,
         onPageChanged: (index) {
           setState(() {
-            _currentCarouselIndex = index;
+            _currentCarouselIndex = index % carouselItems.length;
           });
         },
-        itemCount: carouselItems.length,
         itemBuilder: (context, index) {
-          final item = carouselItems[index];
-          final isCenter = index == _currentCarouselIndex;
+          final itemIndex = index % carouselItems.length;
+          final item = carouselItems[itemIndex];
+          final isCenter = itemIndex == _currentCarouselIndex;
           
           return AnimatedContainer(
             duration: const Duration(milliseconds: 300),
@@ -442,11 +495,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               child: InkWell(
                 borderRadius: BorderRadius.circular(20),
                 onTap: () {
-                  // Handle carousel item tap
+                  _isUserInteracting = true;
+                  _stopAutoScroll();
+                  Future.delayed(const Duration(seconds: 1), () {
+                    _isUserInteracting = false;
+                    _resumeAutoScroll();
+                  });
                 },
                 child: Stack(
                   children: [
-                    // Background pattern
                     Positioned(
                       top: -20,
                       right: -20,
@@ -471,7 +528,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         ),
                       ),
                     ),
-                    // Content
                     Padding(
                       padding: const EdgeInsets.all(20),
                       child: Column(
@@ -512,8 +568,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           );
         },
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildCategoriesGrid() {
     final theme = Theme.of(context);

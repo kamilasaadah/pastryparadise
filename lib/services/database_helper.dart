@@ -1,6 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/recipe.dart';
 import '../models/category.dart' as my_models;
@@ -20,6 +20,84 @@ class DatabaseHelper {
   Future<String?> _getAuthToken() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('auth_token');
+  }
+
+  // Method untuk menghitung rating rata-rata
+  Future<Map<String, Map<String, dynamic>>> _getRecipeRatings(List<String> recipeIds) async {
+    final Map<String, Map<String, dynamic>> ratings = {};
+    
+    if (recipeIds.isEmpty) return ratings;
+    
+    try {
+      final authToken = await _getAuthToken();
+      final headers = {
+        'Content-Type': 'application/json',
+        if (authToken != null) 'Authorization': 'Bearer $authToken',
+      };
+
+      final recipeIdsFilter = recipeIds.map((id) => 'recipe_id="$id"').join('||');
+      final response = await http.get(
+        Uri.parse('$_pocketBaseUrl/api/collections/reviews/records?filter=($recipeIdsFilter)'),
+        headers: headers,
+      );
+
+      if (kDebugMode) {
+        print('=== GET RECIPE RATINGS DEBUG ===');
+        print('Status: ${response.statusCode}');
+        print('Response: ${response.body}');
+      }
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final List<dynamic> reviews = data['items'] ?? [];
+        
+        final Map<String, List<double>> recipeReviews = {};
+        
+        for (final review in reviews) {
+          final recipeId = review['recipe_id'] as String?;
+          final rating = (review['rating'] as num?)?.toDouble();
+          
+          if (recipeId != null && rating != null) {
+            recipeReviews.putIfAbsent(recipeId, () => []).add(rating);
+          }
+        }
+        
+        for (final entry in recipeReviews.entries) {
+          final recipeId = entry.key;
+          final ratingList = entry.value;
+          final averageRating = ratingList.reduce((a, b) => a + b) / ratingList.length;
+          
+          ratings[recipeId] = {
+            'averageRating': averageRating,
+            'reviewCount': ratingList.length,
+          };
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error calculating recipe ratings: $e');
+      }
+    }
+    
+    return ratings;
+  }
+
+  Future<List<Recipe>> _addRatingsToRecipes(List<Recipe> recipes) async {
+    if (recipes.isEmpty) return recipes;
+    
+    final recipeIds = recipes.map((r) => r.id).toList();
+    final ratings = await _getRecipeRatings(recipeIds);
+    
+    return recipes.map((recipe) {
+      final ratingData = ratings[recipe.id];
+      if (ratingData != null) {
+        return recipe.copyWith(
+          averageRating: ratingData['averageRating'] ?? 0.0,
+          reviewCount: ratingData['reviewCount'] ?? 0,
+        );
+      }
+      return recipe;
+    }).toList();
   }
 
   Future<bool> registerUser(String name, String email, String password) async {
@@ -62,19 +140,24 @@ class DatabaseHelper {
         final userData = responseData['record'];
         final authToken = responseData['token'];
 
+        String? avatarUrl;
+        if (userData['avatar'] != null && userData['avatar'].isNotEmpty) {
+          avatarUrl = '$_pocketBaseUrl/api/files/users/${userData['id']}/${userData['avatar']}';
+        }
+
         await saveUserData({
           'id': userData['id'],
           'name': userData['name'],
           'email': userData['email'],
           'token': authToken,
-          'profile_image': userData['avatar'] ?? 'https://randomuser.me/api/portraits/men/32.jpg',
+          'profile_image': avatarUrl ?? 'https://randomuser.me/api/portraits/men/32.jpg',
         });
 
         return {
           'id': userData['id'],
           'name': userData['name'],
           'email': userData['email'],
-          'profile_image': userData['avatar'] ?? 'https://randomuser.me/api/portraits/men/32.jpg',
+          'profile_image': avatarUrl ?? 'https://randomuser.me/api/portraits/men/32.jpg',
         };
       }
       return null;
@@ -117,21 +200,26 @@ class DatabaseHelper {
           },
         );
 
-        debugPrint('Fetch user status: ${response.statusCode} - ${response.body}');
         if (response.statusCode == 200) {
           final userData = jsonDecode(response.body);
+          
+          String? avatarUrl;
+          if (userData['avatar'] != null && userData['avatar'].isNotEmpty) {
+            avatarUrl = '$_pocketBaseUrl/api/files/users/${userData['id']}/${userData['avatar']}';
+          }
+          
           await saveUserData({
             'id': userData['id'],
             'name': userData['name'],
             'email': userData['email'],
             'token': authToken,
-            'profile_image': userData['avatar'] ?? 'https://randomuser.me/api/portraits/men/32.jpg',
+            'profile_image': avatarUrl ?? 'https://randomuser.me/api/portraits/men/32.jpg',
           });
           return {
             'id': userData['id'],
             'name': userData['name'],
             'email': userData['email'],
-            'profile_image': userData['avatar'] ?? 'https://randomuser.me/api/portraits/men/32.jpg',
+            'profile_image': avatarUrl ?? 'https://randomuser.me/api/portraits/men/32.jpg',
           };
         }
       } catch (e) {
@@ -148,10 +236,8 @@ class DatabaseHelper {
     await prefs.setString('user_email', userData['email'] ?? '');
     await prefs.setString('auth_token', userData['token'] ?? '');
     await prefs.setString('profile_image', userData['profile_image'] ?? 'https://randomuser.me/api/portraits/men/32.jpg');
-    debugPrint('User data saved: ${userData['id']}');
   }
 
-  // NEW: Get all categories from PocketBase
   Future<List<my_models.Category>> getCategories() async {
     try {
       final response = await http.get(
@@ -159,7 +245,6 @@ class DatabaseHelper {
         headers: {'Content-Type': 'application/json'},
       );
 
-      debugPrint('Get categories status: ${response.statusCode} - ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final List<dynamic> items = data['items'] ?? [];
@@ -172,7 +257,6 @@ class DatabaseHelper {
     }
   }
 
-  // Helper method to set favorite status for multiple recipes
   Future<List<Recipe>> _setFavoriteStatus(List<Recipe> recipes) async {
     final user = await getCurrentUser();
     if (user == null) return recipes;
@@ -184,22 +268,23 @@ class DatabaseHelper {
         if (authToken != null) 'Authorization': 'Bearer $authToken',
       };
 
-      // Get all favorites for current user
+      final favoriteUrl = '$_pocketBaseUrl/api/collections/favorites/records?filter=user_id="${user['id']}"';
+      
       final response = await http.get(
-        Uri.parse('$_pocketBaseUrl/api/collections/favorites/records?filter=user_id="${user['id']}"'),
+        Uri.parse(favoriteUrl),
         headers: headers,
       );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final List<dynamic> favoriteItems = data['items'] ?? [];
+        
         final Set<String> favoriteRecipeIds = favoriteItems
             .map((item) => item['recipe_id'] as String?)
             .where((id) => id != null)
             .cast<String>()
             .toSet();
 
-        // Update recipes with favorite status
         return recipes.map((recipe) {
           final isFavorite = favoriteRecipeIds.contains(recipe.id);
           return recipe.copyWith(isFavorite: isFavorite);
@@ -225,31 +310,21 @@ class DatabaseHelper {
         headers: headers,
       );
 
-      debugPrint('=== GET RECIPES DEBUG ===');
-      debugPrint('Get recipes status: ${response.statusCode}');
-      debugPrint('Get recipes response body: ${response.body}');
+      if (kDebugMode) {
+        print('=== GET RECIPES DEBUG ===');
+        print('Status: ${response.statusCode}');
+      }
       
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final List<dynamic> items = data['items'] ?? [];
         
-        // Debug setiap item untuk melihat field difficulty
-        debugPrint('=== INDIVIDUAL RECIPE DEBUG ===');
-        for (int i = 0; i < items.length; i++) {
-          final item = items[i];
-          debugPrint('Recipe $i: ${item['title']} - Difficulty: "${item['difficulty']}" (${item['difficulty'].runtimeType})');
-        }
-        
         final recipes = items.map((item) => Recipe.fromJson(item)).toList();
         
-        // Debug hasil parsing
-        debugPrint('=== PARSED RECIPES DEBUG ===');
-        for (int i = 0; i < recipes.length; i++) {
-          debugPrint('Parsed Recipe $i: ${recipes[i].title} - Difficulty: "${recipes[i].difficulty}"');
-        }
+        final recipesWithFavorites = await _setFavoriteStatus(recipes);
+        final recipesWithRatings = await _addRatingsToRecipes(recipesWithFavorites);
         
-        // Set favorite status for all recipes
-        return await _setFavoriteStatus(recipes);
+        return recipesWithRatings;
       }
       return [];
     } catch (e) {
@@ -275,14 +350,13 @@ class DatabaseHelper {
         headers: headers,
       );
 
-      debugPrint('Get recipes by category status: ${response.statusCode} - ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final List<dynamic> items = data['items'] ?? [];
         final recipes = items.map((item) => Recipe.fromJson(item)).toList();
         
-        // Set favorite status for all recipes
-        return await _setFavoriteStatus(recipes);
+        final recipesWithFavorites = await _setFavoriteStatus(recipes);
+        return await _addRatingsToRecipes(recipesWithFavorites);
       }
       return [];
     } catch (e) {
@@ -303,32 +377,15 @@ class DatabaseHelper {
         Uri.parse('$_pocketBaseUrl/api/collections/recipes/records?sort=-created&perPage=$limit&expand=ingredients,steps,id_category'),
         headers: headers,
       );
-
-      debugPrint('=== GET NEWEST RECIPES DEBUG ===');
-      debugPrint('Get newest recipes status: ${response.statusCode}');
-      debugPrint('Get newest recipes response: ${response.body}');
       
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final List<dynamic> items = data['items'] ?? [];
         
-        // Debug setiap item untuk melihat field difficulty
-        debugPrint('=== NEWEST RECIPES INDIVIDUAL DEBUG ===');
-        for (int i = 0; i < items.length; i++) {
-          final item = items[i];
-          debugPrint('Newest Recipe $i: ${item['title']} - Difficulty: "${item['difficulty']}" (${item['difficulty'].runtimeType})');
-        }
-        
         final recipes = items.map((item) => Recipe.fromJson(item)).toList();
         
-        // Debug hasil parsing
-        debugPrint('=== NEWEST PARSED RECIPES DEBUG ===');
-        for (int i = 0; i < recipes.length; i++) {
-          debugPrint('Newest Parsed Recipe $i: ${recipes[i].title} - Difficulty: "${recipes[i].difficulty}"');
-        }
-        
-        // Set favorite status for all recipes
-        return await _setFavoriteStatus(recipes);
+        final recipesWithFavorites = await _setFavoriteStatus(recipes);
+        return await _addRatingsToRecipes(recipesWithFavorites);
       }
       return [];
     } catch (e) {
@@ -339,73 +396,55 @@ class DatabaseHelper {
 
   Future<List<Recipe>> getFavoriteRecipes() async {
     final user = await getCurrentUser();
-    if (user == null) {
-      debugPrint('No user logged in for fetching favorite recipes');
-      return [];
-    }
+    if (user == null) return [];
 
     try {
       final authToken = await _getAuthToken();
-      debugPrint('Auth token used: $authToken');
-      debugPrint('User ID used: ${user['id']}');
       final headers = {
         'Content-Type': 'application/json',
         if (authToken != null) 'Authorization': 'Bearer $authToken',
       };
 
-      // First get all favorite records for the user
+      final favoriteUrl = '$_pocketBaseUrl/api/collections/favorites/records?filter=user_id="${user['id']}"';
+      
       final response = await http.get(
-        Uri.parse('$_pocketBaseUrl/api/collections/favorites/records?filter=user_id="${user['id']}"'),
+        Uri.parse(favoriteUrl),
         headers: headers,
       );
-
-      debugPrint('Get favorite records status: ${response.statusCode} - ${response.body}');
+      
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final List<dynamic> favoriteItems = data['items'] ?? [];
-        debugPrint('Favorite items raw: $favoriteItems');
 
-        if (favoriteItems.isEmpty) {
-          debugPrint('No favorite items found');
-          return [];
-        }
+        if (favoriteItems.isEmpty) return [];
 
-        // Extract recipe IDs from favorites
         final List<String> recipeIds = favoriteItems
             .map((item) => item['recipe_id'] as String?)
             .where((id) => id != null)
             .cast<String>()
             .toList();
 
-        debugPrint('Recipe IDs from favorites: $recipeIds');
+        if (recipeIds.isEmpty) return [];
 
-        if (recipeIds.isEmpty) {
-          debugPrint('No valid recipe IDs found in favorites');
-          return [];
+        final recipeIdsFilter = recipeIds.map((id) => 'id="$id"').join('||');
+        final recipesUrl = '$_pocketBaseUrl/api/collections/recipes/records?filter=($recipeIdsFilter)&expand=ingredients,steps,id_category';
+        
+        final recipesResponse = await http.get(
+          Uri.parse(recipesUrl),
+          headers: headers,
+        );
+
+        if (recipesResponse.statusCode == 200) {
+          final recipesData = jsonDecode(recipesResponse.body);
+          final List<dynamic> recipeItems = recipesData['items'] ?? [];
+          
+          final List<Recipe> favoriteRecipes = recipeItems.map((item) {
+            final recipe = Recipe.fromJson(item);
+            return recipe.copyWith(isFavorite: true);
+          }).toList();
+          
+          return await _addRatingsToRecipes(favoriteRecipes);
         }
-
-        // Now fetch the actual recipes
-        final List<Recipe> favoriteRecipes = [];
-        for (String recipeId in recipeIds) {
-          try {
-            final recipeResponse = await http.get(
-              Uri.parse('$_pocketBaseUrl/api/collections/recipes/records/$recipeId?expand=ingredients,steps,id_category'),
-              headers: headers,
-            );
-
-            debugPrint('Get recipe $recipeId status: ${recipeResponse.statusCode}');
-            if (recipeResponse.statusCode == 200) {
-              final recipeData = jsonDecode(recipeResponse.body);
-              final recipe = Recipe.fromJson(recipeData);
-              favoriteRecipes.add(recipe.copyWith(isFavorite: true));
-            }
-          } catch (e) {
-            debugPrint('Error fetching recipe $recipeId: $e');
-          }
-        }
-
-        debugPrint('Parsed favorite recipes count: ${favoriteRecipes.length}');
-        return favoriteRecipes;
       }
       return [];
     } catch (e) {
@@ -416,42 +455,35 @@ class DatabaseHelper {
 
   Future<bool> toggleFavorite(String recipeId) async {
     final user = await getCurrentUser();
-    if (user == null) {
-      debugPrint('No user logged in for toggling favorite');
-      return false;
-    }
+    if (user == null) return false;
 
     try {
       final authToken = await _getAuthToken();
-      debugPrint('Auth token used for toggle: $authToken');
       final headers = {
         'Content-Type': 'application/json',
         if (authToken != null) 'Authorization': 'Bearer $authToken',
       };
 
-      // Check if favorite already exists
+      final checkUrl = '$_pocketBaseUrl/api/collections/favorites/records?filter=recipe_id="$recipeId"&&user_id="${user['id']}"';
+      
       final checkResponse = await http.get(
-        Uri.parse('$_pocketBaseUrl/api/collections/favorites/records?filter=recipe_id="$recipeId"&&user_id="${user['id']}"'),
+        Uri.parse(checkUrl),
         headers: headers,
       );
-
-      debugPrint('Check favorite status: ${checkResponse.statusCode} - ${checkResponse.body}');
+      
       if (checkResponse.statusCode == 200) {
         final data = jsonDecode(checkResponse.body);
         final List<dynamic> items = data['items'] ?? [];
-        debugPrint('Check favorite details: $data');
 
         if (items.isNotEmpty) {
-          // Remove from favorites
           final favoriteId = items[0]['id'];
+          
           final deleteResponse = await http.delete(
             Uri.parse('$_pocketBaseUrl/api/collections/favorites/records/$favoriteId'),
             headers: headers,
           );
-          debugPrint('Delete favorite status: ${deleteResponse.statusCode} - ${deleteResponse.body}');
           return deleteResponse.statusCode == 200 || deleteResponse.statusCode == 204;
         } else {
-          // Add to favorites
           final addResponse = await http.post(
             Uri.parse('$_pocketBaseUrl/api/collections/favorites/records'),
             headers: headers,
@@ -460,18 +492,11 @@ class DatabaseHelper {
               'user_id': user['id'],
             }),
           );
-          debugPrint('Add favorite status: ${addResponse.statusCode} - ${addResponse.body}');
-          if (addResponse.statusCode == 200 || addResponse.statusCode == 201) {
-            return true;
-          } else {
-            debugPrint('Failed to add favorite details: ${addResponse.body}');
-            return false;
-          }
+          
+          return addResponse.statusCode == 200 || addResponse.statusCode == 201;
         }
-      } else {
-        debugPrint('Check favorite failed with status ${checkResponse.statusCode}: ${checkResponse.body}');
-        return false;
       }
+      return false;
     } catch (e) {
       debugPrint('Error toggling favorite: $e');
       return false;
@@ -491,14 +516,13 @@ class DatabaseHelper {
         headers: headers,
       );
 
-      debugPrint('Search recipes status: ${response.statusCode} - ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final List<dynamic> items = data['items'] ?? [];
         final recipes = items.map((item) => Recipe.fromJson(item)).toList();
         
-        // Set favorite status for all recipes
-        return await _setFavoriteStatus(recipes);
+        final recipesWithFavorites = await _setFavoriteStatus(recipes);
+        return await _addRatingsToRecipes(recipesWithFavorites);
       }
       return [];
     } catch (e) {
@@ -520,7 +544,6 @@ class DatabaseHelper {
         headers: headers,
       );
 
-      debugPrint('Get tips status: ${response.statusCode} - ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final List<dynamic> items = data['items'] ?? [];
@@ -571,13 +594,10 @@ class DatabaseHelper {
         headers: headers,
       );
 
-      debugPrint('Get reviews for recipe ID: $recipeId, Status: ${response.statusCode} - Body: ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final List<dynamic> items = data['items'] ?? [];
-        final reviews = items.map((item) => Review.fromJson(item)).toList();
-        debugPrint('Fetched reviews count: ${reviews.length} - Reviews: $reviews');
-        return reviews;
+        return items.map((item) => Review.fromJson(item)).toList();
       }
       return [];
     } catch (e) {
@@ -589,10 +609,7 @@ class DatabaseHelper {
   Future<bool> createReview(String recipeId, double rating, String comment) async {
     try {
       final authToken = await _getAuthToken();
-      if (authToken == null) {
-        debugPrint('No auth token available');
-        return false;
-      }
+      if (authToken == null) return false;
 
       final headers = {
         'Content-Type': 'application/json',
@@ -600,10 +617,7 @@ class DatabaseHelper {
       };
 
       final user = await getCurrentUser();
-      if (user == null) {
-        debugPrint('No user logged in');
-        return false;
-      }
+      if (user == null) return false;
 
       final response = await http.post(
         Uri.parse('$_pocketBaseUrl/api/collections/reviews/records'),
@@ -617,7 +631,6 @@ class DatabaseHelper {
         }),
       );
 
-      debugPrint('Create review status: ${response.statusCode} - ${response.body}');
       return response.statusCode == 200 || response.statusCode == 201;
     } catch (e) {
       debugPrint('Error creating review: $e');
@@ -628,10 +641,7 @@ class DatabaseHelper {
   Future<bool> updateReview(String reviewId, double rating, String comment) async {
     try {
       final authToken = await _getAuthToken();
-      if (authToken == null) {
-        debugPrint('No auth token available');
-        return false;
-      }
+      if (authToken == null) return false;
 
       final headers = {
         'Content-Type': 'application/json',
@@ -648,7 +658,6 @@ class DatabaseHelper {
         }),
       );
 
-      debugPrint('Update review status: ${response.statusCode} - ${response.body}');
       return response.statusCode == 200;
     } catch (e) {
       debugPrint('Error updating review: $e');
@@ -659,10 +668,7 @@ class DatabaseHelper {
   Future<bool> deleteReview(String reviewId) async {
     try {
       final authToken = await _getAuthToken();
-      if (authToken == null) {
-        debugPrint('No auth token available');
-        return false;
-      }
+      if (authToken == null) return false;
 
       final headers = {
         'Content-Type': 'application/json',
@@ -674,7 +680,6 @@ class DatabaseHelper {
         headers: headers,
       );
 
-      debugPrint('Delete review status: ${response.statusCode} - ${response.body}');
       return response.statusCode == 200 || response.statusCode == 204;
     } catch (e) {
       debugPrint('Error deleting review: $e');
@@ -695,7 +700,6 @@ class DatabaseHelper {
         headers: headers,
       );
 
-      debugPrint('Get ingredients status: ${response.statusCode} - ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final List<dynamic> items = data['items'] ?? [];
@@ -721,7 +725,6 @@ class DatabaseHelper {
         headers: headers,
       );
 
-      debugPrint('Get steps status: ${response.statusCode} - ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final List<dynamic> items = data['items'] ?? [];
@@ -736,28 +739,152 @@ class DatabaseHelper {
 
   Future<String> getUserName(String userId) async {
     try {
-      final authToken = await _getAuthToken();
-      final headers = {
-        'Content-Type': 'application/json',
-        if (authToken != null) 'Authorization': 'Bearer $authToken',
-      };
-
-      final response = await http.get(
-        Uri.parse('$_pocketBaseUrl/api/collections/users/records/$userId'),
-        headers: headers,
-      );
-
-      debugPrint('Get user name for userId: $userId - Status: ${response.statusCode} - Body: ${response.body}');
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return data['name'] ?? 'Unknown User';
-      }
-      return 'Unknown User';
+      final userInfo = await getUserInfo(userId);
+      return userInfo['name'] ?? 'Unknown User';
     } catch (e) {
       debugPrint('Error fetching user name for userId $userId: $e');
       return 'Unknown User';
     }
   }
 
-  String dummyVariable = ''; // Variabel dummy untuk memastikan sintaks valid
+  Future<Map<String, String>> getUserNames(List<String> userIds) async {
+    final Map<String, String> userNames = {};
+    
+    try {
+      final userInfos = await getUserInfos(userIds);
+      for (final entry in userInfos.entries) {
+        userNames[entry.key] = entry.value['name'] ?? 'Unknown User';
+      }
+      return userNames;
+    } catch (e) {
+      debugPrint('Error fetching multiple user names: $e');
+      for (final userId in userIds) {
+        userNames[userId] = 'Unknown User';
+      }
+      return userNames;
+    }
+  }
+
+  Future<Map<String, String?>> getUserInfo(String userId) async {
+    try {
+      var response = await http.get(
+        Uri.parse('$_pocketBaseUrl/api/collections/users/records/$userId'),
+        headers: {'Content-Type': 'application/json'},
+      );
+      
+      if (response.statusCode != 200) {
+        final authToken = await _getAuthToken();
+        if (authToken != null) {
+          response = await http.get(
+            Uri.parse('$_pocketBaseUrl/api/collections/users/records/$userId'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $authToken',
+            },
+          );
+        }
+      }
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final userName = data['name'] ?? 'Unknown User';
+        final avatar = data['avatar'] as String?;
+        
+        String? avatarUrl;
+        if (avatar != null && avatar.isNotEmpty) {
+          avatarUrl = '$_pocketBaseUrl/api/files/users/$userId/$avatar';
+        }
+        
+        return {
+          'name': userName,
+          'avatar': avatarUrl,
+        };
+      } else {
+        return {
+          'name': 'Unknown User',
+          'avatar': null,
+        };
+      }
+    } catch (e) {
+      debugPrint('Error fetching user info for userId $userId: $e');
+      return {
+        'name': 'Unknown User',
+        'avatar': null,
+      };
+    }
+  }
+
+  Future<Map<String, Map<String, String?>>> getUserInfos(List<String> userIds) async {
+    final Map<String, Map<String, String?>> userInfos = {};
+    
+    if (userIds.isEmpty) return userInfos;
+    
+    try {
+      final userIdsFilter = userIds.map((id) => 'id="$id"').join('||');
+      final url = '$_pocketBaseUrl/api/collections/users/records?filter=($userIdsFilter)';
+      
+      var response = await http.get(
+        Uri.parse(url),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode != 200) {
+        final authToken = await _getAuthToken();
+        if (authToken != null) {
+          response = await http.get(
+            Uri.parse(url),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $authToken',
+            },
+          );
+        }
+      }
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final List<dynamic> items = data['items'] ?? [];
+        
+        for (final item in items) {
+          final userId = item['id'] as String?;
+          final userName = item['name'] as String?;
+          final avatar = item['avatar'] as String?;
+          
+          if (userId != null) {
+            String? avatarUrl;
+            if (avatar != null && avatar.isNotEmpty) {
+              avatarUrl = '$_pocketBaseUrl/api/files/users/$userId/$avatar';
+            }
+            
+            userInfos[userId] = {
+              'name': userName ?? 'Unknown User',
+              'avatar': avatarUrl,
+            };
+          }
+        }
+      }
+      
+      for (final userId in userIds) {
+        if (!userInfos.containsKey(userId)) {
+          userInfos[userId] = {
+            'name': 'Unknown User',
+            'avatar': null,
+          };
+        }
+      }
+      
+      return userInfos;
+    } catch (e) {
+      debugPrint('Error fetching multiple user infos: $e');
+      for (final userId in userIds) {
+        userInfos[userId] = {
+          'name': 'Unknown User',
+          'avatar': null,
+        };
+      }
+      return userInfos;
+    }
+  }
+
+  String dummyVariable = '';
 }

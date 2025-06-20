@@ -1,4 +1,3 @@
-import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'ingredient.dart';
 import 'step.dart' as model_step;
@@ -17,6 +16,8 @@ class Recipe {
   final List<Ingredient> ingredients;
   final List<model_step.Step> steps;
   bool isFavorite;
+  final double averageRating;
+  final int reviewCount;
 
   Recipe({
     required this.id,
@@ -32,6 +33,8 @@ class Recipe {
     this.ingredients = const [],
     this.steps = const [],
     this.isFavorite = false,
+    this.averageRating = 0.0,
+    this.reviewCount = 0,
   });
 
   factory Recipe.fromJson(Map<String, dynamic> json) {
@@ -45,12 +48,6 @@ class Recipe {
         ? '$pocketBaseUrl/api/files/recipes/$recordId/$imageFileName'
         : 'https://via.placeholder.com/150';
 
-    // Debug logging
-    developer.log('=== RECIPE JSON DEBUG ===', name: 'Recipe.fromJson');
-    developer.log('Title: ${json['title']}', name: 'Recipe.fromJson');
-    developer.log('Description: ${json['description']}', name: 'Recipe.fromJson');
-    developer.log('Difficulty RAW: ${json['difficulty']}', name: 'Recipe.fromJson');
-
     return Recipe(
       id: json['id']?.toString() ?? '',
       title: json['title']?.toString() ?? 'Resep Tanpa Nama',
@@ -59,7 +56,7 @@ class Recipe {
       prepTime: int.tryParse(json['prepTime']?.toString() ?? '0') ?? 0,
       cookTime: double.tryParse(json['cookTime']?.toString() ?? '0') ?? 0.0,
       servings: double.tryParse(json['servings']?.toString() ?? '1') ?? 1.0,
-      difficulty: json['difficulty']?.toString() ?? 'Unknown', // SAMA PERSIS SEPERTI DESCRIPTION!
+      difficulty: json['difficulity']?.toString() ?? 'Unknown',
       userId: json['user_id']?.toString(),
       categoryId: json['id_category']?.toString(),
       ingredients: (json['expand']?['ingredients'] as List<dynamic>?)
@@ -69,25 +66,9 @@ class Recipe {
           ?.map((item) => model_step.Step.fromJson(item as Map<String, dynamic>))
           .toList() ?? [],
       isFavorite: false,
+      averageRating: double.tryParse(json['averageRating']?.toString() ?? '0') ?? 0.0,
+      reviewCount: int.tryParse(json['reviewCount']?.toString() ?? '0') ?? 0,
     );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'title': title,
-      'description': description,
-      'image': image.split('/').last,
-      'prepTime': prepTime,
-      'cookTime': cookTime,
-      'servings': servings,
-      'difficulty': difficulty,
-      'user_id': userId,
-      'id_category': categoryId,
-      'ingredients': ingredients.map((e) => e.toJson()).toList(),
-      'steps': steps.map((e) => e.toJson()).toList(),
-      'isFavorite': isFavorite,
-    };
   }
 
   Recipe copyWith({
@@ -104,6 +85,8 @@ class Recipe {
     List<Ingredient>? ingredients,
     List<model_step.Step>? steps,
     bool? isFavorite,
+    double? averageRating,
+    int? reviewCount,
   }) {
     return Recipe(
       id: id ?? this.id,
@@ -119,17 +102,18 @@ class Recipe {
       ingredients: ingredients ?? this.ingredients,
       steps: steps ?? this.steps,
       isFavorite: isFavorite ?? this.isFavorite,
+      averageRating: averageRating ?? this.averageRating,
+      reviewCount: reviewCount ?? this.reviewCount,
     );
   }
 
-  // Helper methods untuk styling (opsional)
   static Color getDifficultyColor(String difficulty) {
-    switch (difficulty) {
-      case 'Easy':
+    switch (difficulty.toLowerCase()) {
+      case 'easy':
         return Colors.green;
-      case 'Medium':
+      case 'medium':
         return Colors.orange;
-      case 'Hard':
+      case 'hard':
         return Colors.red;
       default:
         return Colors.grey;
@@ -137,12 +121,12 @@ class Recipe {
   }
 
   static IconData getDifficultyIcon(String difficulty) {
-    switch (difficulty) {
-      case 'Easy':
+    switch (difficulty.toLowerCase()) {
+      case 'easy':
         return Icons.sentiment_satisfied;
-      case 'Medium':
+      case 'medium':
         return Icons.sentiment_neutral;
-      case 'Hard':
+      case 'hard':
         return Icons.sentiment_dissatisfied;
       default:
         return Icons.help_outline;

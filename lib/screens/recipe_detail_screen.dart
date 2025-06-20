@@ -85,21 +85,44 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
   Future<void> _loadReviews() async {
     try {
       final reviews = await DatabaseHelper.instance.getReviewsForRecipe(widget.recipe.id);
+    
+    if (reviews.isNotEmpty && mounted) {
+      // Get all unique user IDs from reviews
+      final userIds = reviews.map((review) => review.userId).toSet().toList();
+      
+      // Fetch all user infos at once (names and avatars)
+      final userInfos = await DatabaseHelper.instance.getUserInfos(userIds);
+      
+      // Update reviews with user info
+      final reviewsWithUserInfo = reviews.map((review) {
+        final userInfo = userInfos[review.userId];
+        debugPrint('Review by ${review.userId}: userName = ${userInfo?['name']}, avatar = ${userInfo?['avatar']}');
+        return review; // Note: We'll pass userInfo to ReviewCard separately if needed
+      }).toList();
+      
+      if (mounted) {
+        setState(() {
+          _reviews = reviewsWithUserInfo;
+          _isLoadingReviews = false;
+        });
+      }
+    } else {
       if (mounted) {
         setState(() {
           _reviews = reviews;
           _isLoadingReviews = false;
         });
       }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoadingReviews = false;
-        });
-        _showErrorSnackBar('Error loading reviews: ${e.toString()}');
-      }
+    }
+  } catch (e) {
+    if (mounted) {
+      setState(() {
+        _isLoadingReviews = false;
+      });
+      _showErrorSnackBar('Error loading reviews: ${e.toString()}');
     }
   }
+}
 
   Future<void> _loadIngredients() async {
     try {
@@ -209,7 +232,6 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDarkMode = theme.brightness == Brightness.dark;
     
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,

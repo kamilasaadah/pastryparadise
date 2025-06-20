@@ -9,7 +9,6 @@ import 'dart:convert';
 import 'dart:io';
 import '../theme/app_theme.dart';
 import 'login_screen.dart';
-import 'home_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({Key? key}) : super(key: key);
@@ -171,8 +170,28 @@ class _RegisterScreenState extends State<RegisterScreen>
 
         if (response.statusCode == 200 || response.statusCode == 201) {
           if (!mounted) return;
+          
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.white),
+                  SizedBox(width: 8),
+                  Text('Account created successfully! Please login.'),
+                ],
+              ),
+              backgroundColor: Colors.green[600],
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              margin: const EdgeInsets.all(16),
+              duration: const Duration(seconds: 3),
+            ),
+          );
+          
+          // Navigate to login screen instead of home screen
           Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (context) => const HomeScreen()),
+            MaterialPageRoute(builder: (context) => const LoginScreen()),
           );
         } else {
           final errorData = jsonDecode(responseBody);
